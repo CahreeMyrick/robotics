@@ -6,8 +6,6 @@ FREE = "."
 START = "S"
 GOAL = "G"
 
-
-# Demo 1: BFS is good because the goal is very close.
 grid_bfs_better = [
     "S.G....",
     ".......",
@@ -15,16 +13,12 @@ grid_bfs_better = [
     ".......",
 ]
 
-# Demo 2: Best-first is good because the heuristic leads almost directly to the goal.
-# It usually expands very few nodes.
 grid_best_first_better = [
     "S........G",
     "#########.",
     "..........",
 ]
 
-# Demo 3: A* is best because it avoids BFS's broad search,
-# but still guarantees a shortest path unlike greedy best-first.
 grid_astar_better = [
     "S........",
     "#######..",
@@ -37,9 +31,15 @@ grid_astar_better = [
     ".........",
 ]
 
+
 def parse_grid(lines):
     grid = [list(row) for row in lines]
-    start = goal = None
+    return grid
+
+
+def find_start_goal(grid):
+    start = None
+    goal = None
 
     for r in range(len(grid)):
         for c in range(len(grid[0])):
@@ -48,7 +48,8 @@ def parse_grid(lines):
             elif grid[r][c] == GOAL:
                 goal = (r, c)
 
-    return grid, start, goal
+    return start, goal
+
 
 def print_grid(grid, path):
     path_set = set(path)
@@ -62,99 +63,114 @@ def print_grid(grid, path):
                 row += grid[r][c]
         print(row)
 
+
 def in_bounds(pos, num_rows, num_cols):
-    if (pos[0] >= 0 and pos[0] < num_rows) and (pos[1] >= 0 and pos[1] < num_cols):
-        return True
-    return False
+    return 0 <= pos[0] < num_rows and 0 <= pos[1] < num_cols
+
 
 def neighbors(pos, num_rows, num_cols):
     neighs = []
-    dirs = {(1, 0), (-1, 0), (0, 1), (0, -1)}
+    dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
-    for dir in dirs:
-        nxt_pos = tuple(x+y for x,y in zip(pos, dir))
-        if not in_bounds(nxt_pos, num_rows, num_cols):
-            continue
-        neighs.append(nxt_pos)
+    for direction in dirs:
+        nxt_pos = tuple(x + y for x, y in zip(pos, direction))
 
-    # print("nieghs", neighs)
-    # breakpoint()
+        if in_bounds(nxt_pos, num_rows, num_cols):
+            neighs.append(nxt_pos)
+
     return neighs
 
-# hueristic
+
 def manhattan(a, b):
-    return abs(a[0]-b[0]) + abs(a[1]-b[1])
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+def reconstruct_path(parent, start, goal):
+    path = []
+    curr = goal
+
+    while curr is not None:
+        path.append(curr)
+        curr = parent[curr]
+
+    path.reverse()
+    return path
 
 
 def bfs(grid):
-    # num rows and cols
     num_rows = len(grid)
     num_cols = len(grid[0])
 
-    # initialize visited and queue and sol
-    queue = deque([(0, 0)])
-    visited = {(0,0)}
-    sol = [(0,0)]
+    start, goal = find_start_goal(grid)
+
+    queue = deque([start])
+    visited = {start}
+    parent = {start: None}
 
     while len(queue) > 0:
-
-        # curr node
         curr = queue.popleft()
 
+        if curr == goal:
+            return reconstruct_path(parent, start, goal)
+
         for neigh in neighbors(curr, num_rows, num_cols):
-            if neigh not in visited and grid[neigh[0]][neigh[1]] != WALL:
+            r, c = neigh
+
+            if neigh not in visited and grid[r][c] != WALL:
                 visited.add(neigh)
+                parent[neigh] = curr
                 queue.append(neigh)
-                sol.append(neigh)
-                # print("sol", sol)
-                if grid[neigh[0]][neigh[1]] == GOAL:
-                    return sol
+
+    return []
+
 
 def best_first(grid):
-    # num rows and cols
     num_rows = len(grid)
     num_cols = len(grid[0])
 
-    # initialize visited and queue and sol
-    queue = deque([(0, 0)])
-    visited = {(0,0)}
-    sol = [(0,0)]
+    start, goal = find_start_goal(grid)
 
-    while len(queue) > 0:
+    pq = []
+    heapq.heappush(pq, (manhattan(start, goal), start))
 
-        # curr node
-        curr = queue.popleft()
-        neigh_weights = {}
+    visited = {start}
+    parent = {start: None}
+
+    while len(pq) > 0:
+        _, curr = heapq.heappop(pq)
+
+        if curr == goal:
+            return reconstruct_path(parent, start, goal)
 
         for neigh in neighbors(curr, num_rows, num_cols):
-            if neigh not in visited and grid[neigh[0]][neigh[1]] != WALL:
-                neigh_weights[neigh] = manhattan(curr, neigh)
+            r, c = neigh
+
+            if neigh not in visited and grid[r][c] != WALL:
+                visited.add(neigh)
+                parent[neigh] = curr
+
+                priority = manhattan(neigh, goal)
+                heapq.heappush(pq, (priority, neigh))
+
+    return []
 
 
-        nxt = min(neigh_weights, key=neigh_weights.get)
-        visited.add(nxt)
-        queue.append(nxt)
-        sol.append(nxt)
-
-        if grid[nxt[0]][nxt[1]] == GOAL:
-            return sol
-    return sol
-
-
-def run_demo(grid):
+def run_demo(grid_lines):
+    grid = parse_grid(grid_lines)
 
     algs = {
-        ("BFS", bfs),
-        ("Best-first", best_first)
+        "BFS": bfs,
+        "Best-first": best_first,
     }
 
-    for alg_name, alg in algs:
+    for alg_name, alg in algs.items():
         path = alg(grid)
-
 
         print(alg_name)
         print(path)
         print(f"Path length: {len(path) - 1 if path else 'No path'}")
+        print_grid(grid, path)
+        print()
 
 
 run_demo(grid_bfs_better)
